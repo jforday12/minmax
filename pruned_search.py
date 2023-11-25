@@ -1,5 +1,6 @@
 import time
 import copy
+import matplotlib.pyplot as plt
 
 
 class State:
@@ -21,6 +22,9 @@ class Game:
     self.m = m  # number of objects in each heap
     self.k = k  # maximum number of objects that can be removed from a
     self.heaps = []
+
+    self._visited = 0 # number of visited states (used for benchmark)
+
 
   def initialize_game(self):
     self.heaps = [self.m] * self.n  # initialize all heaps with m
@@ -60,6 +64,34 @@ class Game:
       print("---MIN TURN---")
       state = self.min(state)
 
+  def benchmark(self):
+    """
+    Simulates Max vs Min with selection time and 
+    nodes visited being benchmarked.
+    """
+    turn = 1
+    times = {}
+    nodes_visited = {}
+
+    state = State(self.heaps, True)
+    while not self.terminal(state):
+      t = time.time()
+      heap, remove = self.max(state)
+      self.heaps[heap] -= remove
+      times[turn] = time.time() - t
+      nodes_visited[turn] = self._visited
+      turn+=1
+      state = State(self.heaps, False)
+      if self.terminal(state):
+        break
+      t = time.time()
+      state = self.min(state)
+      times[turn] = time.time() - t
+      nodes_visited[turn] = self._visited
+      turn+=1
+    return times, nodes_visited
+    
+
   def draw_heaps(self):
     #draws the heaps and associated sticks
     print("Current game state:")
@@ -68,6 +100,7 @@ class Game:
       print(self.heaps[i] * " | ")
 
   def max(self, state):
+    self._visited = 0 # reset visted nodes
     start_time = time.time()
     #runs the function to get all possible actions
     actions = self.actions(state)
@@ -86,6 +119,7 @@ class Game:
     return best_action
 
   def min(self, state):
+    self._visited = 0 # reset visted nodes
     start_time = time.time()
     #runs the function to get all possible actions
     actions = self.actions(state)
@@ -177,12 +211,92 @@ class Game:
   #return the resulting state for a given move
   #once the move is executed the turn is fliiped to the other player (min or max)
   def result(self, state, a):
+    self._visited += 1 # increment to track visited nodes
     new_heaps = copy.copy(state.heaps)
     new_heaps[a[0]] = new_heaps[a[0]] - a[1]
     return State(new_heaps, not state.max)
+  
 
+def performance_evaluation(n_max, m_max, k_max) :
+  """
+  Runs performance evaluation varying the number of objects, heaps and
+  objects that can removed. 
+
+  Args:
+    n_max {int} -- max number of heaps to iterate to;
+    m_max {int} -- max number of objects per heap to iterate to;
+    k_max {int} -- max number of objects that can be removed to iterate to;
+  """
+  n_range = [i for i in range(1, n_max+1)]
+  m_range = [i for i in range(5, m_max+1)]
+  k_range = [i for i in range(1, k_max+1)]
+
+  _n_evaluation(n_range, 5, 3)
+  _m_evaluation(3, m_range, 3)
+  _k_evaluation(3, 10, k_range)
+
+def _n_evaluation(n_range, m_def, k_def):
+      n_fig = plt.figure()
+      times_plot = n_fig.add_subplot(1, 2, 1)
+      times_plot.set_xlabel("Turn")
+      times_plot.set_ylabel("Average selection time (seconds)")
+      visited_plot = n_fig.add_subplot(1, 2, 2)
+      visited_plot.set_xlabel("Turn")
+      visited_plot.set_ylabel("Average nodes visited (log)")
+
+      for n in n_range:
+        print(f"n = {n}")
+        game = Game(n, m_def, k_def)
+        game.initialize_game()
+        times, visited = game.benchmark()
+        times_plot.plot(times.keys(), times.values(), label=f"n = {n}")
+        times_plot.legend()
+        visited_plot.plot(visited.keys(), visited.values(), label=f"n = {n}")
+        visited_plot.set_yscale('log')
+        visited_plot.legend()
+      plt.show()
+
+def _m_evaluation(n_def, m_range, k_def):
+      m_fig = plt.figure()
+      times_plot = m_fig.add_subplot(1, 2, 1)
+      times_plot.set_xlabel("Turn")
+      times_plot.set_ylabel("Average selection time (seconds)")
+      visited_plot = m_fig.add_subplot(1, 2, 2)
+      visited_plot.set_xlabel("Turn")
+      visited_plot.set_ylabel("Average nodes visited (log)")
+
+      for m in m_range:
+        game = Game(n_def,m, k_def)
+        game.initialize_game()
+        times, visited = game.benchmark()
+        times_plot.plot(times.keys(), times.values(), label=f"m = {m}")
+        times_plot.legend()
+        visited_plot.plot(visited.keys(), visited.values(), label=f"m = {m}")
+        visited_plot.set_yscale('log')
+        visited_plot.legend()
+      plt.show()
+
+def _k_evaluation(n_def, m_def, k_range):
+      k_fig = plt.figure()
+      times_plot = k_fig.add_subplot(1, 2, 1)
+      times_plot.set_xlabel("Turn")
+      times_plot.set_ylabel("Average selection time (seconds)")
+      visited_plot = k_fig.add_subplot(1, 2, 2)
+      visited_plot.set_xlabel("Turn")
+      visited_plot.set_ylabel("Average nodes visited (log)")
+
+      for k in k_range:
+        game = Game(n_def, m_def, k)
+        game.initialize_game()
+        times, visited = game.benchmark()
+        times_plot.plot(times.keys(), times.values(), label=f"k = {k}")
+        times_plot.legend()
+        visited_plot.plot(visited.keys(), visited.values(), label=f"k = {k}")
+        visited_plot.set_yscale('log')
+        visited_plot.legend()
+      plt.show()
+
+  
 
 if __name__ == "__main__":
-  game = Game(4, 4, 3)
-  game.initialize_game()
-  game.play()
+  performance_evaluation(5, 50, 3)
